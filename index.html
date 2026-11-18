@@ -390,7 +390,7 @@ async function tour(){
   await sleep(7000);
   document.body.classList.remove('tour');
 }
-document.getElementById('v-tour').onclick=()=>tour();
+document.getElementById('v-tour').onclick=async()=>{try{await document.documentElement.requestFullscreen();await sleep(1500);}catch(e){}await tour();try{if(document.fullscreenElement)await document.exitFullscreen();}catch(e){}};
 // h：パネルを隠して画面だけ（撮影用）
 document.addEventListener('keydown',e=>{if(e.key==='b'){const tk=D.chome.findIndex(c=>c.name==='高島平２丁目');let best=-1,bv=-1;for(let i=0;i<N;i++){if(D.apt.ch[i]===tk&&est[i].mid>bv&&D.apt.fl[i]>=A.floodMin){bv=est[i].mid;best=i;}}if(best>=0){S.sel=best;showDetail(best);}}
  if(e.key==='h'){['panel','perf'].forEach(id=>{const el=document.getElementById(id);el.style.display=el.style.display==='none'?'':'none';});}});
