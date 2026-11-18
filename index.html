@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>階段の孤島 ― 板橋区</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/deck.gl@9.0/dist.min.js"></script>
+<style>
+:root{--ink:#1d1f22;--sub:#6b7076;--line:#d9dcdf;--bg:#f4f5f6;--red:#c8322d;--blue:#3a7cc4;--gray:#b9bdc2;--panel:#ffffff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:"Noto Sans JP",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+#map{position:absolute;inset:0}
+#panel{position:absolute;top:12px;left:12px;width:304px;max-height:calc(100% - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;box-shadow:0 4px 18px rgba(0,0,0,.08);z-index:2}
+h1{font-size:19px;margin:0 0 2px;letter-spacing:.02em}
+.lead{font-size:12px;color:var(--sub);margin:0 0 12px;line-height:1.55}
+.lbl{font-size:12px;color:var(--sub);margin:12px 0 6px;display:flex;justify-content:space-between}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;padding:8px 0;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:#fff}
+input[type=range]{width:100%;accent-color:var(--ink)}
+.big{margin:14px 0 4px;padding:12px;border-radius:8px;background:#faf3f2;border:1px solid #efd6d4}
+.big .n{font-size:30px;font-weight:700;color:var(--red);line-height:1.1}
+.big .n small{font-size:14px;color:var(--ink);font-weight:500}
+.big .d{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.5}
+.big.fl{background:#eef4fb;border-color:#cfe0f2}
+.big.fl .n{color:var(--blue)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:4px 3px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap}
+th:nth-child(2),td:nth-child(2){text-align:left}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:#f6f6f6}
+.badge{display:inline-block;font-size:10px;padding:0 4px;border-radius:3px;background:#e9eaeb;color:var(--sub);margin-left:3px}
+.badge.st{background:#ffe9e6;color:var(--red)}
+.foot{font-size:10.5px;color:var(--sub);line-height:1.55;margin-top:10px}
+.row{display:flex;gap:6px;margin-top:8px}
+.btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 0;font:inherit;font-size:12.5px;cursor:pointer}
+.btn:hover{background:#f3f3f3}
+.legend-in{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--sub);margin-top:8px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+#detail{position:absolute;right:12px;bottom:12px;max-height:calc(100% - 24px);overflow:auto;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;z-index:2;display:none}
+#detail h3{margin:0 0 6px;font-size:14px}
+#detail .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin-top:6px}
+#detail .kv div:nth-child(odd){color:var(--sub)}
+#perf{position:absolute;left:330px;bottom:10px;font-size:11px;color:var(--sub);z-index:2;background:rgba(255,255,255,.8);padding:2px 6px;border-radius:4px}
+#sheet{position:absolute;inset:0;background:rgba(30,30,30,.35);z-index:5;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:24px}
+#paper{background:#fff;width:880px;min-height:1123px;padding:48px 52px;box-shadow:0 6px 30px rgba(0,0,0,.25)}
+#paper h2{font-size:18px;margin:0 0 4px}
+#paper .m{font-size:11px;color:var(--sub);margin-bottom:14px;line-height:1.6}
+#paper table{font-size:11.5px}
+#paper td,#paper th{padding:5px 4px}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:9;background:var(--bg);font-size:14px;color:var(--sub)}
+.close{float:right;border:0;background:none;font-size:18px;cursor:pointer;color:var(--sub)}
+.pub{font-size:12px;color:var(--sub);background:#f3f4f5;border-radius:6px;padding:8px;margin-top:8px;display:none;line-height:1.5}
+#cap{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);max-width:min(860px,70vw);background:rgba(20,22,25,.86);color:#fff;font-size:21px;line-height:1.55;padding:12px 22px;border-radius:10px;z-index:6;display:none;text-align:center;font-weight:500}
+#card{position:absolute;inset:0;background:#fff;z-index:8;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}
+#card .q{font-size:40px;font-weight:700;line-height:1.4;letter-spacing:.02em}
+#card .q em{font-style:normal;color:var(--red)}
+#card .s{font-size:18px;color:var(--sub);margin-top:22px;line-height:1.7}
+#card .src{font-size:13px;color:var(--sub);margin-top:30px;line-height:1.7}
+body.tour #panel{pointer-events:none}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="loading">PLATEAUの建物データを読み込んでいます…</div>
+
+<div id="panel">
+  <h1>階段の孤島</h1>
+  <p class="lead">停電や浸水のとき、階段しか残らない上の階の高齢者が、どの建物にいそうかを数えます。データ：PLATEAU 板橋区 建築物モデル（共同住宅 <span id="napt">-</span>棟）</p>
+
+  <div class="lbl"><span>場面</span></div>
+  <div class="seg" id="mode">
+    <button data-m="normal">平時</button>
+    <button data-m="outage" class="on">停電</button>
+    <button data-m="flood">洪水＋停電</button>
+  </div>
+
+  <div id="legend" class="legend-in">
+    <span><span class="sw" style="background:#969ba1"></span>数えない階</span>
+    <span><span class="sw" style="background:#2e70be"></span>水につかる階</span>
+    <span><span class="sw" style="background:#cc2e28"></span>階段しか残らない階</span>
+  </div>
+  <div class="lbl"><span>何階から上を数えるか</span><b id="tv">3階以上</b></div>
+  <input type="range" id="T" min="2" max="6" step="1" value="3">
+
+  <div id="pbox">
+    <div class="lbl"><span>エレベーターのない確率（3〜5階建て）<span class="badge">仮定</span></span><b id="pv">60%</b></div>
+    <input type="range" id="P" min="30" max="90" step="5" value="60">
+  </div>
+
+  <div class="big" id="bigbox">
+    <div class="n" id="total">-</div>
+    <div class="d" id="totald">-</div>
+  </div>
+
+  <div class="lbl"><span>町丁目ランキング</span></div>
+  <div class="foot" id="rk-note" style="margin:0 0 4px"></div>
+  <table>
+    <thead><tr><th>#</th><th>町丁目</th><th>推定人数</th><th>棟数</th><th>65歳以上</th></tr></thead>
+    <tbody id="rank"></tbody>
+  </table>
+
+  <div class="row">
+    <button class="btn" id="v-all">区全体</button>
+    <button class="btn" id="v-taka">高島平</button>
+    <button class="btn" id="v-list">訪問リスト（A4）</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="v-tour">自動デモ（動画用・約2分）</button>
+  </div>
+  <div class="lbl"><span>表示</span></div>
+  <div class="seg" id="vis">
+    <button data-v="internal" class="on">自治体の内部用（建物ごと）</button>
+    <button data-v="public">一般公開（町丁目だけ）</button>
+  </div>
+  <div class="pub" id="pubnote">一般公開では、建物ごとの色と訪問リストを出しません。同じ町丁目の建物はすべて同じ色（町丁目の推定人数が多いほど濃い赤）です。</div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<div id="detail"></div>
+<div id="perf"></div>
+
+<div id="cap"></div>
+<div id="card"></div>
+<div id="sheet"><div id="paper"></div></div>
+
+<script>
+const S={mode:'outage',T:3,P:0.60,vis:'internal',sel:null,focusChome:null};
+// 仮定（画面の下に明記）
+const A={p6:0.05, fhDefault:3.0, floodMin:0.5};
+let D=null, N=0, bands=[], est=null, ctxPolys=[], aptPolys=[];
+const fmt=n=>Math.round(n).toLocaleString('ja-JP');
+const r10=n=>n>=1000?Math.round(n/10)*10:Math.round(n);
+
+async function load(){
+  try{const r=await fetch('data.json.gz');if(!r.ok)throw 0;const b=new Uint8Array(await r.arrayBuffer());
+    if(b[0]===0x1f&&b[1]===0x8b){const ds=new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'));D=JSON.parse(await new Response(ds).text());}
+    else D=JSON.parse(new TextDecoder().decode(b));}
+  catch(e){const r=await fetch('data.json'); D=await r.json();}
+  N=D.apt.F.length;
+  document.getElementById('napt').textContent=fmt(N);
+  // 町丁目の値
+  D.chome.forEach(c=>{c.m=c.hh>0?c.pop/c.hh:null; c.h=c.pop>0?c.a65/c.pop:null;});
+  // 周辺建物
+  const cx=D.ctx; for(let i=0;i<cx.h.length;i++){const a=cx.off[i],b=cx.off[i+1];const p=[];for(let k=a;k<b;k+=2)p.push([cx.xy[k],cx.xy[k+1]]);ctxPolys.push({p,h:cx.h[i]});}
+  const ap=D.apt; for(let i=0;i<N;i++){const a=ap.off[i],b=ap.off[i+1];const p=[];for(let k=a;k<b;k+=2)p.push([ap.xy[k],ap.xy[k+1]]);aptPolys.push(p);}
+  document.getElementById('loading').style.display='none';
+  recompute(); initDeck();
+}
+
+function rng(lo,hi){return (hi-lo)<=Math.max(1,hi*0.05)?`約${fmt(hi)}`:`${fmt(lo)}〜${fmt(hi)}`;}
+function floorH(i){const F=D.apt.F[i],H=D.apt.H[i];const fh=H/F;return (fh>=2.5&&fh<=4.5)?fh:A.fhDefault;}
+function conf(i){let m=0;const fh=D.apt.H[i]/D.apt.F[i];if(!(fh>=2.5&&fh<=4.5))m++;if(!D.apt.Asrc[i])m++;const c=D.apt.ch[i];if(c<0||!D.chome[c].h)m++;if(D.apt.R[i]<D.apt.Rhi[i]*0.9)m++;return m===0?'A':m===1?'B':'C';}
+
+// 1棟の計算：数える階の数・水につかる階の数・推定人数（下限・中央・上限）
+function calc(i, P){
+  const ap=D.apt, F=ap.F[i], T=S.T, fh=floorH(i);
+  const c=ap.ch[i]; const ch=c>=0?D.chome[c]:null;
+  const m=ch&&ch.m?ch.m:1.9, h=ch&&ch.h!=null?ch.h:0.23;
+  let k=0, upper=0, p=1;
+  if(S.mode==='flood'){
+    const d=ap.fl[i]||0;
+    if(d>=A.floodMin){k=Math.min(F,Math.ceil(d/fh)); upper=Math.max(F-Math.max(k,T-1),0);} else {k=0; upper=0;}
+  } else {
+    upper=Math.max(F-(T-1),0);
+    if(S.mode==='normal'){p=F<=5?P:A.p6;}
+  }
+  // 1フロアあたりの住民数（国勢調査に合わせて割り振った値）
+  const lo=ap.R[i]/F*upper*h*p, hi=ap.Rhi[i]/F*upper*h*p;
+  return {k,upper,p,lo,mid:(lo+hi)/2,hi,fh,m,h};
+}
+
+function recompute(){
+  const t0=performance.now();
+  const n=N; est=new Array(n);
+  const chome=D.chome.map(()=>({mid:0,lo:0,hi:0,nb:0,midLo:0,midHi:0}));
+  let tot={lo:0,mid:0,hi:0,nb:0};
+  for(let i=0;i<n;i++){
+    const e=calc(i,S.P); est[i]=e;
+    if(e.mid>0){tot.lo+=e.lo;tot.mid+=e.mid;tot.hi+=e.hi;tot.nb++;
+      const c=D.apt.ch[i]; if(c>=0){const q=chome[c];q.mid+=e.mid;q.lo+=e.lo;q.hi+=e.hi;q.nb++;}}
+  }
+  // 感度：建物ごとにPを30〜90%でばらつかせて200回計算し、99%以上の回で上位10に残る町丁目を「順位が安定」とする
+  let stable=new Set();
+  if(S.mode==='normal'){
+    let seed=12345;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+    const base=new Float64Array(n);for(let i=0;i<n;i++){const e=est[i];base[i]=e.p>0?e.mid/e.p:0;}
+    const nc=D.chome.length, hit=new Float64Array(nc), TR=200;
+    for(let t=0;t<TR;t++){const s=new Float64Array(nc);for(let i=0;i<n;i++){if(!base[i])continue;const F=D.apt.F[i];const p=F<=5?0.3+0.6*rnd():A.p6;const c=D.apt.ch[i];if(c>=0)s[c]+=base[i]*p;}
+      const idx=Array.from(s.keys()).sort((a,b)=>s[b]-s[a]).slice(0,10);idx.forEach(j=>hit[j]++);}
+    for(let j=0;j<nc;j++)if(hit[j]/TR>=0.99)stable.add(j);
+  }
+  S.chomeEst=chome; S.tot=tot; S.stable=stable; S.maxChome=Math.max(...chome.map(q=>q.mid));
+  buildBands();
+  renderPanel();
+  const ms=performance.now()-t0;
+  document.getElementById('perf').textContent=`再計算 ${fmt(N)}棟：${ms.toFixed(0)} ms（ブラウザ内）`;
+  if(window.deckgl) updateLayers();
+}
+
+const COL={base:[150,155,161],water:[46,112,190],red:[204,46,40],redSoft:[224,140,130],pub:[170,175,181]};
+function pushFloors(i,f0,f1,fh,c){for(let f=f0;f<f1;f++)bands.push({i,z0:f*fh,z1:(f+1)*fh,c});}
+function buildBands(){
+  bands=[];
+  for(let i=0;i<N;i++){
+    const e=est[i], F=D.apt.F[i], fh=e.fh;
+    if(S.vis==='public'){const c=D.apt.ch[i];const q=S.chomeEst[c]?S.chomeEst[c].mid:0;const t=Math.min(1,q/(S.maxChome||1));bands.push({i,z0:0,z1:F*fh,c:[Math.round(220+(204-220)*t),Math.round(222+(46-222)*t),Math.round(225+(40-225)*t)],solid:1});continue;}
+    if(S.mode==='flood'){
+      const k=e.k; const lowTop=Math.min(F,Math.max(k,S.T-1));
+      if(k>0) pushFloors(i,0,k,fh,COL.water);
+      if(lowTop>k) pushFloors(i,k,lowTop,fh,COL.base);
+      if(F>lowTop) pushFloors(i,lowTop,F,fh,k>0?COL.red:COL.base);
+    } else {
+      const low=Math.min(S.T-1,F);
+      if(low>0) pushFloors(i,0,low,fh,COL.base);
+      if(F>low) pushFloors(i,low,F,fh,(S.mode==='normal'&&F>5)?COL.redSoft:COL.red);
+    }
+  }
+}
+
+function renderPanel(){
+  const t=S.tot, big=document.getElementById('bigbox');
+  big.className='big'+(S.mode==='flood'?' fl':'');
+  const lab={normal:'平時：エレベーターのない上の階に住む高齢者（推定）',outage:'停電：エレベーターが止まり、階段しか使えない上の階の高齢者（推定）',flood:'洪水（想定最大規模）＋停電：水より上の階に残り、外に出られない高齢者（推定）'}[S.mode];
+  document.getElementById('total').innerHTML=`${fmt(r10(t.mid))}<small> 人</small>`;
+  document.getElementById('totald').innerHTML=`${lab}<br>幅：${fmt(r10(t.lo))}〜${fmt(r10(t.hi))}人／対象 ${fmt(t.nb)}棟`;
+  document.getElementById('tv').textContent=`${S.T}階以上`;
+  document.getElementById('pv').textContent=`${Math.round(S.P*100)}%`;
+  document.getElementById('pbox').style.opacity=S.mode==='normal'?1:.35;
+  document.getElementById('pbox').querySelector('input').disabled=S.mode!=='normal';
+  const ce=S.chomeEst.map((q,j)=>({...q,j})).filter(q=>q.mid>0).sort((a,b)=>b.mid-a.mid).slice(0,10);
+  document.getElementById('rank').innerHTML=ce.map((q,ix)=>{const c=D.chome[q.j];const st=S.stable.has(q.j)?'<span class="badge st">順位が安定</span>':'';return `<tr data-j="${q.j}"><td>${ix+1}</td><td>${c.name}${st}</td><td>${fmt(r10(q.mid))}</td><td>${q.nb}</td><td>${c.h!=null?Math.round(c.h*100)+'%':'-'}</td></tr>`;}).join('');
+  document.getElementById('rk-note').textContent=S.mode==='normal'?'建物ごとにPを30〜90%でばらつかせた200回の計算で、99%以上の回で上位10に残る＝順位が安定':'';
+  document.querySelectorAll('#rank tr').forEach(tr=>tr.onclick=()=>flyChome(+tr.dataset.j));
+  document.getElementById('pubnote').style.display=S.vis==='public'?'block':'none';
+  document.getElementById('v-list').disabled=S.vis==='public';
+  document.getElementById('v-list').style.opacity=S.vis==='public'?.4:1;
+  document.getElementById('foot').innerHTML=`推定の方法：国勢調査2020の「共同住宅に住む人の数（1・2階建て／3〜5階／6〜10階／11階以上）」を、PLATEAUの延べ床面積（底面積×階数）に比例して各建物に割り振り、1フロアの住民数を出します。これに、数える階の数と、町丁目の65歳以上の割合${S.mode==='normal'?'、エレベーターのない確率（6階以上は5%と仮定）':''}を掛けます。幅の下限は町丁目の人口を超えないよう補正した値、上限は補正なしの値です。階高＝計測高さ÷階数（2.5〜4.5mの外は3.0mと仮定）。水につかる階＝浸水深÷階高の切り上げ（浸水深0.5m以上＝床上浸水相当以上の建物だけ。国交省の水害リスクマップの区分）。<br>出典：国土交通省 Project PLATEAU 板橋区 建築物モデル（2025年度、CC BY 4.0）／板橋区「令和7年版 板橋区の統計」（住民基本台帳 令和8年1月1日現在、国勢調査 令和2年）。`;
+  if(S.sel!=null) showDetail(S.sel);
+}
+
+function showDetail(i){
+  const el=document.getElementById('detail');
+  if(i==null||S.vis==='public'){el.style.display='none';return;}
+  const e=est[i], ap=D.apt, F=ap.F[i], c=ap.ch[i]>=0?D.chome[ap.ch[i]]:null;
+  const W=120,Hh=Math.min(220,Math.max(90,F*14)), fh=Hh/F;
+  let svg=`<svg width="${W+140}" height="${Hh+30}" style="display:block;margin:6px 0">`;
+  for(let f=1;f<=F;f++){
+    let col='#b9bdc2';
+    if(S.mode==='flood'){ if(f<=e.k) col='#3a7cc4'; else if(e.k>0&&f>Math.max(e.k,S.T-1)) col='#c8322d'; }
+    else if(f>=S.T) col=(S.mode==='normal'&&F>5)?'#d6786e':'#c8322d';
+    const y=10+Hh-f*fh;
+    svg+=`<rect x="20" y="${y}" width="${W}" height="${fh-1}" fill="${col}"/>`;
+    if(F<=16||f%5===0||f===1) svg+=`<text x="${W+26}" y="${y+fh-2}" font-size="10" fill="#6b7076">${f}階</text>`;
+  }
+  if(S.mode==='flood'&&ap.fl[i]>0){const wy=10+Hh-(ap.fl[i]/e.fh)*fh; svg+=`<line x1="0" x2="${W+40}" y1="${wy}" y2="${wy}" stroke="#3a7cc4" stroke-width="2" stroke-dasharray="4 3"/><text x="${W+60}" y="${wy+4}" font-size="10" fill="#2e70be">← 水位 ${ap.fl[i].toFixed(1)}m</text>`;}
+  svg+=`<line x1="10" x2="${W+30}" y1="${10+Hh}" y2="${10+Hh}" stroke="#555"/></svg>`;
+  const dur=ap.dur[i]?`${ap.dur[i]}時間`:'-';
+  el.innerHTML=`<button class="close" onclick="S.sel=null;showDetail(null)">×</button><h3>建物 ${ap.id[i]}（${c?c.name:'町丁目不明'}）</h3>${svg}
+  <div class="kv"><div>地上階数</div><div>${F}階（PLATEAU）</div><div>計測高さ</div><div>${ap.H[i]}m／階高 ${e.fh.toFixed(2)}m</div>
+  <div>底面積</div><div>${fmt(ap.A[i])}㎡${ap.Asrc[i]?'':'（形から計算）'}</div>
+  <div>洪水の浸水深</div><div>${ap.fl[i]>0?ap.fl[i].toFixed(2)+'m（想定最大規模）'+(ap.fl[i]<A.floodMin?'<br>0.5m未満のため数えない':'<br>水が引くまで '+dur):'浸水想定なし'}</div>
+  <div>数える階</div><div>${e.upper}フロア${S.mode==='flood'&&e.k>0?`（${e.k===1?'1階':'1〜'+e.k+'階'}は水につかる）`:''}</div>
+  <div>65歳以上（推定）</div><div><b>${rng(e.lo,e.hi)}人</b></div>
+  <div>65歳以上の割合</div><div>${c&&c.h!=null?Math.round(c.h*100)+'%（町丁目）':'-'}</div>
+  <div>信頼度</div><div>${conf(i)}</div></div>`;
+  el.style.display='block';
+}
+
+// ---- deck.gl ----
+const {DeckGL,SolidPolygonLayer,COORDINATE_SYSTEM,TextLayer,LightingEffect,AmbientLight,DirectionalLight}=deck;
+let viewState;
+function toLL(x,y){return [D.meta.lon0+x/D.meta.kx, D.meta.lat0+y/D.meta.ky];}
+function initDeck(){
+  const tk=D.chome.find(c=>c.name==='高島平２丁目');
+  const [lon,lat]=tk&&tk.cx!=null?toLL(tk.cx,tk.cy):[139.66,35.785];
+  viewState={longitude:lon,latitude:lat,zoom:15.4,pitch:58,bearing:-28};
+  const lighting=new LightingEffect({a:new AmbientLight({intensity:1.6}),d:new DirectionalLight({direction:[-1,-2,-3],intensity:1.3})});
+  window.deckgl=new DeckGL({container:'map',initialViewState:viewState,controller:true,effects:[lighting],
+    parameters:{clearColor:[0.957,0.961,0.965,1]},
+    getTooltip:({object,layer})=>{if(!object||!layer||layer.id!=='apt'||S.vis==='public')return null;const i=object.i;return {text:`${D.apt.F[i]}階建て／推定 ${rng(est[i].lo,est[i].hi)}人`};},
+    onClick:({object,layer})=>{if(object&&layer&&layer.id==='apt'){S.sel=object.i;showDetail(object.i);}},
+    layers:[]});
+  updateLayers();
+}
+function updateLayers(){
+  const o=[D.meta.lon0,D.meta.lat0];
+  const ctx=new SolidPolygonLayer({id:'ctx',data:ctxPolys,coordinateSystem:COORDINATE_SYSTEM.METER_OFFSETS,coordinateOrigin:o,extruded:true,
+    getPolygon:d=>d.p,getElevation:d=>d.h,getFillColor:[236,237,239,170],material:{ambient:.6,diffuse:.4}});
+  const apt=new SolidPolygonLayer({id:'apt',data:bands,coordinateSystem:COORDINATE_SYSTEM.METER_OFFSETS,coordinateOrigin:o,extruded:true,pickable:true,
+    getPolygon:d=>aptPolys[d.i].map(p=>[p[0],p[1],d.z0+0.15]),getElevation:d=>d.solid?d.z1-d.z0:Math.max(0.3,d.z1-d.z0-0.45),getFillColor:d=>d.c,
+    updateTriggers:{getPolygon:[S.mode,S.T,S.vis],getElevation:[S.mode,S.T,S.vis],getFillColor:[S.mode,S.T,S.P,S.vis]},material:{ambient:.55,diffuse:.55}});
+  const labels=new TextLayer({id:'lab',data:D.chome.filter(c=>c.cx!=null&&c.napt>5),getPosition:c=>toLL(c.cx,c.cy).concat([60]),getText:c=>c.name,
+    getSize:12,getColor:[40,40,40,220],fontFamily:'Noto Sans JP, sans-serif',characterSet:'auto',background:true,getBackgroundColor:[255,255,255,200],backgroundPadding:[3,1]});
+  window.deckgl.setProps({layers:[ctx,apt,labels]});
+}
+function fly(lon,lat,zoom,pitch=58,bearing=-28){window.deckgl.setProps({initialViewState:{longitude:lon,latitude:lat,zoom,pitch,bearing,transitionDuration:1400,transitionInterpolator:new deck.FlyToInterpolator()}});}
+function flyChome(j){const c=D.chome[j];if(c.cx==null)return;const [lon,lat]=toLL(c.cx,c.cy);fly(lon,lat,16.2);S.focusChome=j;}
+
+// ---- 操作 ----
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#mode button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.mode=b.dataset.m;recompute();});
+document.querySelectorAll('#vis button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#vis button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.vis=b.dataset.v;if(S.vis==='public'){S.sel=null;showDetail(null);}recompute();});
+document.getElementById('T').oninput=e=>{S.T=+e.target.value;recompute();};
+document.getElementById('P').oninput=e=>{S.P=+e.target.value/100;recompute();};
+document.getElementById('v-all').onclick=()=>fly(139.675,35.768,12.9,50,-15);
+document.getElementById('v-taka').onclick=()=>{const tk=D.chome.find(c=>c.name==='高島平２丁目');const [lon,lat]=toLL(tk.cx,tk.cy);fly(lon,lat,15.4);};
+document.getElementById('v-list').onclick=()=>openSheet();
+document.getElementById('sheet').onclick=e=>{if(e.target.id==='sheet')e.target.style.display='none';};
+
+function openSheet(){
+  if(S.vis==='public')return;
+  const j=S.focusChome;
+  const idx=[];for(let i=0;i<N;i++){if(est[i].mid>0&&(j==null||D.apt.ch[i]===j))idx.push(i);}
+  idx.sort((a,b)=>est[b].mid-est[a].mid);
+  const top=idx.slice(0,30);
+  const modeName={normal:'平時',outage:'停電',flood:'洪水（想定最大規模）＋停電'}[S.mode];
+  const area=j==null?'板橋区全体':D.chome[j].name;
+  const rows=top.map((i,ix)=>{const c=D.apt.ch[i]>=0?D.chome[D.apt.ch[i]].name:'-';const xs=aptPolys[i];const [lo,la]=toLL(xs.reduce((s,p)=>s+p[0],0)/xs.length,xs.reduce((s,p)=>s+p[1],0)/xs.length);return [ix+1,c,D.apt.id[i],`${la.toFixed(5)}, ${lo.toFixed(5)}`,D.apt.F[i],rng(est[i].lo,est[i].hi),D.apt.fl[i]>0?D.apt.fl[i].toFixed(1)+'m':'-',conf(i)];});
+  const csv=['順位,町丁目,建物ID,緯度経度,階数,65歳以上（推定）,浸水深,信頼度'].concat(rows.map(r=>r.map(v=>String(v).includes(',')?'"'+v+'"':v).join(','))).join('\n');
+  document.getElementById('paper').innerHTML=`<button class="close" onclick="document.getElementById('sheet').style.display='none'">×</button>
+  <h2>訪問の優先リスト（${area}／${modeName}）</h2>
+  <div class="m">自治体・委託先の内部用。名前・部屋番号は含みません。場所は緯度・経度（建物の中心）で示します。人数は65歳以上の推定で、確定値ではありません。条件：${S.T}階以上${S.mode==='normal'?`、エレベーターのない確率 ${Math.round(S.P*100)}%`:''}。<br>出典：PLATEAU 板橋区 建築物モデル（CC BY 4.0）、板橋区の統計（住民基本台帳）。作成：階段の孤島</div>
+  <table><thead><tr><th>#</th><th>町丁目</th><th>建物ID</th><th>緯度, 経度</th><th>階数</th><th>65歳以上（推定）</th><th>浸水深</th><th>信頼度</th><th>訪問済</th></tr></thead>
+  <tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}<td>□</td></tr>`).join('')}</tbody></table>
+  <div class="row" style="max-width:240px;margin-top:16px"><button class="btn" id="cp">CSVをコピー</button></div>`;
+  document.getElementById('cp').onclick=async()=>{try{await navigator.clipboard.writeText(csv);document.getElementById('cp').textContent='コピーしました';}catch(e){document.getElementById('cp').textContent='コピーできませんでした';}};
+  document.getElementById('sheet').style.display='flex';
+}
+
+// ---- 状態を変える関数（ボタンと自動デモの両方で使う）----
+function setMode(m){S.mode=m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x.dataset.m===m));recompute();}
+function setVis(v){S.vis=v;document.querySelectorAll('#vis button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));if(v==='public'){S.sel=null;showDetail(null);}recompute();}
+function setT(t){S.T=t;document.getElementById('T').value=t;recompute();}
+function setP(p){S.P=p;document.getElementById('P').value=Math.round(p*100);recompute();}
+function rot(lon,lat,zoom,pitch,b0,b1,ms){window.deckgl.setProps({initialViewState:{longitude:lon,latitude:lat,zoom,pitch,bearing:b1,transitionDuration:ms,transitionInterpolator:new deck.LinearInterpolator(['bearing','zoom','pitch','longitude','latitude'])}});}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function cap(t){const c=document.getElementById('cap');if(!t){c.style.display='none';return;}c.innerHTML=t;c.style.display='block';}
+function card(html){const c=document.getElementById('card');if(!html){c.style.display='none';return;}c.innerHTML=html;c.style.display='flex';}
+async function tour(){
+  document.body.classList.add('tour');document.getElementById('panel').scrollTop=0;
+  const tk=D.chome.find(c=>c.name==='高島平２丁目');const [lon,lat]=toLL(tk.cx,tk.cy);
+  setVis('internal');setMode('outage');setT(3);setP(0.6);S.sel=null;showDetail(null);document.getElementById('sheet').style.display='none';
+  window.deckgl.setProps({initialViewState:{longitude:lon,latitude:lat,zoom:16.3,pitch:62,bearing:-40}});
+  card('<div class="q">エレベーターが止まった朝、<br><em>14階</em>の人は降りられるのか。</div><div class="s">階段の孤島 ― PLATEAUで、階段しか残らない人を建物ごとに数える<br>東京都板橋区の共同住宅 '+fmt(N)+'棟</div>');
+  await sleep(6500); card(null);
+  cap('板橋区・高島平。停電でエレベーターが止まると、3階より上の住民は階段しか使えません。');
+  rot(lon,lat,16.0,60,-40,-10,14000); await sleep(7000);
+  cap('PLATEAUの建物モデルにある「地上階数」と「計測高さ」で、建物を1階ずつ切り分けました。赤が、階段しか残らない階です。');
+  await sleep(8000);
+  cap(`国勢調査の人数を建物に割り振り、町丁目の65歳以上の割合を掛けると、板橋区で約${fmt(Math.round(S.tot.mid/100)*100)}人。`);
+  rot(lon,lat,15.2,55,-10,10,9000); await sleep(9000);
+  cap(`いちばん多いのは高島平２丁目で約${fmt(Math.round(S.chomeEst[D.chome.indexOf(tk)].mid/10)*10)}人。この町の65歳以上の${Math.round(tk.h*100)}%が、建物の3階より上にいる計算です。`);
+  await sleep(8500);
+  // 洪水
+  setMode('flood');
+  cap('洪水（想定最大規模）の場面。PLATEAUには建物ごとの浸水深が入っています。浸水深÷階高で「水につかる階」を青にします。');
+  rot(lon,lat,16.4,64,10,35,12000); await sleep(9000);
+  cap('青の上に残る赤い階の人は、水が引くまで外に出られません。停電も重なると、エレベーターも使えません。');
+  await sleep(8000);
+  // 1棟の断面
+  let best=-1,bv=-1;for(let i=0;i<N;i++){if(D.apt.ch[i]===D.chome.indexOf(tk)&&est[i].mid>bv&&D.apt.fl[i]>=A.floodMin){bv=est[i].mid;best=i;}}
+  if(best>=0){S.sel=best;showDetail(best);const xs=aptPolys[best];const cx=xs.reduce((s,p)=>s+p[0],0)/xs.length,cy=xs.reduce((s,p)=>s+p[1],0)/xs.length;const [blon,blat]=toLL(cx,cy);fly(blon,blat,17.3,62,35);
+    cap(`1棟を選ぶと、断面が出ます。この建物は${D.apt.F[best]}階建てで、浸水深は${D.apt.fl[best].toFixed(1)}m。水が引くまでの時間は約${D.apt.dur[best]||'-'}時間（PLATEAUの浸水継続時間）。`);}
+  await sleep(10000);
+  S.sel=null;showDetail(null);
+  // 平時と感度
+  setMode('normal');fly(lon,lat,14.6,50,0);
+  cap('平時も、エレベーターのない3〜5階建ての上の階では、毎日の買い物や通院が階段です。');
+  await sleep(7000);
+  cap('エレベーターの有無はデータにないため、確率をスライダーにしました。建物ごとに確率をばらつかせて計算し直しても上位に残る町丁目に「順位が安定」と出ます。');
+  for(const p of [0.3,0.45,0.6,0.75,0.9,0.6]){setP(p);await sleep(1500);}
+  await sleep(1500);
+  cap('「何階から上を数えるか」も変えられます。2万2千棟の再計算は、ブラウザの中で一瞬です。');
+  for(const t of [4,5,3]){setT(t);await sleep(1800);}
+  await sleep(1200);
+  // 公開範囲
+  setMode('outage');
+  cap('一般公開では、建物ごとの色を出さず、町丁目の集計だけを示します。特定の建物が狙われないようにするためです。');
+  setVis('public'); await sleep(7000);
+  setVis('internal');
+  cap('自治体と委託先の内部用には、訪問の優先リスト（A4）を出せます。名前も部屋番号も入りません。停電の朝にも紙で持ち出せます。');
+  S.focusChome=D.chome.indexOf(tk); openSheet(); await sleep(8500);
+  document.getElementById('sheet').style.display='none';
+  cap(null);
+  card('<div class="q">階段の前にいる人から、数え始める。</div><div class="s">階段の孤島 ― 平時も停電時も、階段しか残らない人をPLATEAUで数える<br>北川真太郎・末吉真凰・河野将士・宮原貢輝（大学1年）</div><div class="src">データ：国土交通省 Project PLATEAU 板橋区 建築物モデル（2025年度、CC BY 4.0）<br>板橋区「令和7年版 板橋区の統計」（住民基本台帳 令和8年1月1日現在、国勢調査 令和2年）</div>');
+  await sleep(7000);
+  document.body.classList.remove('tour');
+}
+document.getElementById('v-tour').onclick=()=>tour();
+// h：パネルを隠して画面だけ（撮影用）
+document.addEventListener('keydown',e=>{if(e.key==='b'){const tk=D.chome.findIndex(c=>c.name==='高島平２丁目');let best=-1,bv=-1;for(let i=0;i<N;i++){if(D.apt.ch[i]===tk&&est[i].mid>bv&&D.apt.fl[i]>=A.floodMin){bv=est[i].mid;best=i;}}if(best>=0){S.sel=best;showDetail(best);}}
+ if(e.key==='h'){['panel','perf'].forEach(id=>{const el=document.getElementById(id);el.style.display=el.style.display==='none'?'':'none';});}});
+
+load().then(()=>{if(location.hash==='#tour')setTimeout(tour,800);}).catch(e=>{document.getElementById('loading').textContent='読み込みに失敗しました：'+e;});
+</script>
+</body>
+</html>
