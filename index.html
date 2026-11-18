@@ -109,7 +109,8 @@ body.tour #panel{pointer-events:none}
     <button class="btn" id="v-list">訪問リスト（A4）</button>
   </div>
   <div class="row">
-    <button class="btn" id="v-tour">自動デモ（動画用・約2分）</button>
+    <button class="btn" id="v-tour">自動デモ（約2分）</button>
+    <button class="btn" id="v-rec">動画を書き出す</button>
   </div>
   <div class="lbl"><span>表示</span></div>
   <div class="seg" id="vis">
@@ -284,6 +285,7 @@ function initDeck(){
     parameters:{clearColor:[0.957,0.961,0.965,1]},
     getTooltip:({object,layer})=>{if(!object||!layer||layer.id!=='apt'||S.vis==='public')return null;const i=object.i;return {text:`${D.apt.F[i]}階建て／推定 ${rng(est[i].lo,est[i].hi)}人`};},
     onClick:({object,layer})=>{if(object&&layer&&layer.id==='apt'){S.sel=object.i;showDetail(object.i);}},
+    onAfterRender:()=>{if(REC.on){const c=window.deckgl.getCanvas?window.deckgl.getCanvas():document.querySelector('#map canvas');if(c){REC.lastW=c.width;REC.lastH=c.height;REC.fctx.canvas.width=c.width;REC.fctx.canvas.height=c.height;REC.fctx.drawImage(c,0,0);}}},
     layers:[]});
   updateLayers();
 }
@@ -390,6 +392,77 @@ async function tour(){
   await sleep(7000);
   document.body.classList.remove('tour');
 }
+
+// ---- 動画の書き出し（3D画面と字幕を1920×1080に合成して webm にする）----
+const REC={on:false,fctx:document.createElement('canvas').getContext('2d'),cap:'',card:null};
+const plain=t=>String(t||'').replace(/<br\s*\/?>/g,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ');
+const _cap=cap, _card=card;
+cap=function(t){REC.cap=t?plain(t):'';_cap(t);};
+card=function(html){REC.card=html?html:null;_card(html);};
+function wrapLines(ctx,text,maxW){const out=[];for(const para of text.split('\n')){let line='';for(const ch of para){if(ctx.measureText(line+ch).width>maxW&&line){out.push(line);line=ch;}else line+=ch;}out.push(line);}return out;}
+function drawRec(ctx){
+  const W=1920,H=1080;ctx.fillStyle='#f4f5f6';ctx.fillRect(0,0,W,H);
+  const src=REC.fctx.canvas;
+  if(src.width>0){const s=Math.max(W/src.width,H/src.height);const w=src.width*s,h=src.height*s;ctx.drawImage(src,(W-w)/2,(H-h)/2,w,h);}
+  const F='"Noto Sans JP", sans-serif';
+  // 左上：場面と人数
+  if(!REC.card){
+    const mode={normal:'平時',outage:'停電',flood:'洪水（想定最大規模）＋停電'}[S.mode];
+    ctx.fillStyle='rgba(255,255,255,0.93)';ctx.strokeStyle='#d9dcdf';ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(40,40,560,S.vis==='public'?170:230,16);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1d1f22';ctx.font='700 34px '+F;ctx.fillText('階段の孤島　板橋区',68,92);
+    ctx.fillStyle='#6b7076';ctx.font='500 24px '+F;ctx.fillText('場面：'+mode+(S.vis==='public'?'（一般公開）':''),68,132);
+    if(S.vis!=='public'){ctx.fillStyle=S.mode==='flood'?'#2e70be':'#c8322d';ctx.font='800 64px Inter, '+F;ctx.fillText(fmt(r10(S.tot.mid))+' 人',68,206);
+      ctx.fillStyle='#6b7076';ctx.font='500 22px '+F;ctx.fillText('65歳以上・推定',68+ctx.measureText(fmt(r10(S.tot.mid))+' 人').width*0+330,206);}
+    // 凡例
+    const lg=[['#969ba1','数えない階'],['#2e70be','水につかる階'],['#cc2e28','階段しか残らない階']];
+    let x=68,y=S.vis==='public'?178:250;ctx.font='500 22px '+F;
+    if(S.vis!=='public'){ctx.fillStyle='rgba(255,255,255,0.93)';ctx.beginPath();ctx.roundRect(40,y-30,560,48,12);ctx.fill();
+      for(const [c,t] of lg){ctx.fillStyle=c;ctx.fillRect(x,y-18,20,20);ctx.fillStyle='#1d1f22';ctx.fillText(t,x+28,y);x+=ctx.measureText(t).width+60;}}
+  }
+  // 断面パネル
+  if(S.sel!=null&&S.vis!=='public'&&!REC.card){const i=S.sel,e=est[i],ap=D.apt,F_=ap.F[i];const px=W-520,py=120,pw=480,ph=760;
+    ctx.fillStyle='rgba(255,255,255,0.96)';ctx.strokeStyle='#d9dcdf';ctx.beginPath();ctx.roundRect(px,py,pw,ph,16);ctx.fill();ctx.stroke();
+    const c=ap.ch[i]>=0?D.chome[ap.ch[i]].name:'';ctx.fillStyle='#1d1f22';ctx.font='700 28px '+F;ctx.fillText('1棟の断面（'+c+'）',px+28,py+52);
+    const bh=Math.min(36,380/F_),bx=px+40,bw=220,by=py+90;
+    for(let f=1;f<=F_;f++){let col='#969ba1';if(S.mode==='flood'){if(f<=e.k)col='#2e70be';else if(e.k>0&&f>Math.max(e.k,S.T-1))col='#cc2e28';}else if(f>=S.T)col='#cc2e28';
+      const yy=by+(F_-f)*bh;ctx.fillStyle=col;ctx.fillRect(bx,yy,bw,bh-3);if(F_<=16||f%5===0||f===1){ctx.fillStyle='#6b7076';ctx.font='500 18px '+F;ctx.fillText(f+'階',bx+bw+12,yy+bh-8);}}
+    let ty=by+F_*bh+50;ctx.font='500 24px '+F;ctx.fillStyle='#1d1f22';
+    const lines=[`地上${F_}階・計測高さ${ap.H[i]}m（階高${e.fh.toFixed(2)}m）`,ap.fl[i]>0?`浸水深 ${ap.fl[i].toFixed(2)}m（想定最大規模）`:'浸水想定なし',ap.dur[i]?`水が引くまで 約${ap.dur[i]}時間`:'',`65歳以上（推定）${rng(e.lo,e.hi)}人`];
+    for(const l of lines){if(!l)continue;ctx.fillText(l,px+28,ty);ty+=38;}}
+  // A4リスト
+  if(document.getElementById('sheet').style.display==='flex'&&!REC.card){const px=360,py=90,pw=1200,ph=900;ctx.fillStyle='rgba(30,30,30,0.35)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff';ctx.fillRect(px,py,pw,ph);ctx.fillStyle='#1d1f22';ctx.font='700 34px '+F;
+    const t=document.querySelector('#paper h2');ctx.fillText(t?t.textContent:'',px+60,py+80);
+    ctx.font='500 20px '+F;ctx.fillStyle='#6b7076';ctx.fillText('名前・部屋番号は含みません。場所は建物の中心の緯度・経度。人数は65歳以上の推定。',px+60,py+122);
+    const rows=[...document.querySelectorAll('#paper tr')].slice(0,15);let y=py+180;const cols=[0,40,200,340,600,680,860,960,1060];
+    rows.forEach((r,ri)=>{const cells=[...r.children].map(c=>c.textContent);ctx.font=(ri===0?'700 ':'500 ')+'21px '+F;ctx.fillStyle='#1d1f22';cells.forEach((v,ci)=>ctx.fillText(v,px+60+(cols[ci]||0),y));ctx.strokeStyle='#e6e6e6';ctx.beginPath();ctx.moveTo(px+60,y+14);ctx.lineTo(px+pw-60,y+14);ctx.stroke();y+=44;});}
+  // タイトル・最後の画面
+  if(REC.card){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);const d=document.createElement('div');d.innerHTML=REC.card;
+    const q=d.querySelector('.q'),s=d.querySelector('.s'),sr=d.querySelector('.src');let y=430;
+    if(q){ctx.font='900 76px '+F;const ls=wrapLines(ctx,plain(q.innerHTML),1600);ls.forEach(l=>{ctx.fillStyle='#1d1f22';const w=ctx.measureText(l).width;
+      // 「14階」だけ赤
+      const idx=l.indexOf('14階');if(idx>=0){const a=l.slice(0,idx),b='14階',c=l.slice(idx+3);let x=(W-w)/2;ctx.fillText(a,x,y);x+=ctx.measureText(a).width;ctx.fillStyle='#c8322d';ctx.fillText(b,x,y);x+=ctx.measureText(b).width;ctx.fillStyle='#1d1f22';ctx.fillText(c,x,y);}else ctx.fillText(l,(W-w)/2,y);y+=104;});}
+    if(s){ctx.font='500 34px '+F;ctx.fillStyle='#6b7076';y+=30;for(const l of plain(s.innerHTML).split('\n')){const w=ctx.measureText(l).width;ctx.fillText(l,(W-w)/2,y);y+=52;}}
+    if(sr){ctx.font='500 24px '+F;ctx.fillStyle='#6b7076';y+=40;for(const l of plain(sr.innerHTML).split('\n')){const w=ctx.measureText(l).width;ctx.fillText(l,(W-w)/2,y);y+=38;}}}
+  // 字幕
+  if(REC.cap&&!REC.card){ctx.font='700 40px '+F;const ls=wrapLines(ctx,REC.cap,1500);const bh=ls.length*58+40;const by=H-60-bh;
+    ctx.fillStyle='rgba(20,22,25,0.86)';ctx.beginPath();ctx.roundRect((W-1600)/2,by,1600,bh,16);ctx.fill();ctx.fillStyle='#fff';
+    ls.forEach((l,k)=>{const w=ctx.measureText(l).width;ctx.fillText(l,(W-w)/2,by+62+k*58);});}
+}
+async function recordTour(){
+  await document.fonts.ready;
+  const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;const ctx=cv.getContext('2d');
+  REC.on=true;window.deckgl.redraw&&window.deckgl.redraw(true);
+  const stream=cv.captureStream(30);const mt=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  const mr=new MediaRecorder(stream,{mimeType:mt,videoBitsPerSecond:8000000});const chunks=[];mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+  let run=true;const loop=()=>{if(!run)return;drawRec(ctx);requestAnimationFrame(loop);};loop();
+  mr.start(1000);await tour();await sleep(500);run=false;mr.stop();await new Promise(r=>mr.onstop=r);REC.on=false;
+  const blob=new Blob(chunks,{type:'video/webm'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='kaidan_no_kotou_demo.webm';document.body.appendChild(a);a.click();
+  document.getElementById('v-rec').textContent='書き出しました（ダウンロード）';
+}
+
+document.getElementById('v-rec').onclick=()=>{document.getElementById('v-rec').textContent='録画中…（約2分）';recordTour();};
 document.getElementById('v-tour').onclick=async()=>{try{await document.documentElement.requestFullscreen();await sleep(1500);}catch(e){}await tour();try{if(document.fullscreenElement)await document.exitFullscreen();}catch(e){}};
 // h：パネルを隠して画面だけ（撮影用）
 document.addEventListener('keydown',e=>{if(e.key==='b'){const tk=D.chome.findIndex(c=>c.name==='高島平２丁目');let best=-1,bv=-1;for(let i=0;i<N;i++){if(D.apt.ch[i]===tk&&est[i].mid>bv&&D.apt.fl[i]>=A.floodMin){bv=est[i].mid;best=i;}}if(best>=0){S.sel=best;showDetail(best);}}
