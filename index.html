@@ -20,7 +20,16 @@ h1{font-size:19px;margin:0 0 2px;letter-spacing:.02em}
 .seg button{flex:1;border:0;background:#fff;padding:8px 0;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button.on{background:var(--ink);color:#fff}
-input[type=range]{width:100%;accent-color:var(--ink)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;margin:8px 0 0;border-radius:3px;outline:none;cursor:pointer;
+  background:linear-gradient(to right,var(--ink) 0,var(--ink) var(--fill,50%),var(--line) var(--fill,50%),var(--line) 100%)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+input[type=range]:disabled{cursor:default}
+.ticks{display:flex;justify-content:space-between;padding:0 9px;margin:6px 0 0}
+.ticks span{width:0;display:flex;justify-content:center;white-space:nowrap;font-size:10.5px;color:var(--sub)}
+.ticks span.on{color:var(--ink);font-weight:700}
+.ends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--sub);margin:3px 0 0}
+.offnote{font-size:10.5px;color:var(--sub);margin:4px 0 0;display:none}
 .big{margin:14px 0 4px;padding:12px;border-radius:8px;background:#faf3f2;border:1px solid #efd6d4}
 .big .n{font-size:30px;font-weight:700;color:var(--red);line-height:1.1}
 .big .n small{font-size:14px;color:var(--ink);font-weight:500}
@@ -84,11 +93,16 @@ body.tour #panel{pointer-events:none}
     <span><span class="sw" style="background:#cc2e28"></span>階段しか残らない階</span>
   </div>
   <div class="lbl"><span>何階から上を数えるか</span><b id="tv">3階以上</b></div>
-  <input type="range" id="T" min="2" max="6" step="1" value="3">
+  <input type="range" id="T" min="2" max="6" step="1" value="3" aria-label="何階から上を数えるか">
+  <div class="ticks" id="T-ticks"><span>2階</span><span>3階</span><span>4階</span><span>5階</span><span>6階</span></div>
+  <div class="ends"><span>← 低い階から（人数が多くなる）</span><span>高い階から →</span></div>
 
   <div id="pbox">
     <div class="lbl"><span>エレベーターのない確率（3〜5階建て）<span class="badge">仮定</span></span><b id="pv">60%</b></div>
-    <input type="range" id="P" min="30" max="90" step="5" value="60">
+    <input type="range" id="P" min="30" max="90" step="5" value="60" aria-label="エレベーターのない確率">
+    <div class="ticks" id="P-ticks"><span>30%</span><span>45%</span><span>60%</span><span>75%</span><span>90%</span></div>
+    <div class="ends"><span>← エレベーターありが多い</span><span>なしが多い →</span></div>
+    <div class="offnote" id="P-off">停電・洪水の場面ではエレベーターが止まるので、この確率は使いません（平時だけ動かせます）</div>
   </div>
 
   <div class="big" id="bigbox">
@@ -233,6 +247,8 @@ function renderPanel(){
   document.getElementById('pv').textContent=`${Math.round(S.P*100)}%`;
   document.getElementById('pbox').style.opacity=S.mode==='normal'?1:.35;
   document.getElementById('pbox').querySelector('input').disabled=S.mode!=='normal';
+  paintSlider('T',S.T,[2,3,4,5,6]);paintSlider('P',Math.round(S.P*100),[30,45,60,75,90]);
+  document.getElementById('P-off').style.display=S.mode==='normal'?'none':'block';
   const ce=S.chomeEst.map((q,j)=>({...q,j})).filter(q=>q.mid>0).sort((a,b)=>b.mid-a.mid).slice(0,10);
   document.getElementById('rank').innerHTML=ce.map((q,ix)=>{const c=D.chome[q.j];const st=S.stable.has(q.j)?'<span class="badge st">順位が安定</span>':'';return `<tr data-j="${q.j}"><td>${ix+1}</td><td>${c.name}${st}</td><td>${fmt(r10(q.mid))}</td><td>${q.nb}</td><td>${c.h!=null?Math.round(c.h*100)+'%':'-'}</td></tr>`;}).join('');
   document.getElementById('rk-note').textContent=S.mode==='normal'?'建物ごとにPを30〜90%でばらつかせた200回の計算で、99%以上の回で上位10に残る＝順位が安定':'';
@@ -341,6 +357,10 @@ function openSheet(){
 // ---- 状態を変える関数（ボタンと自動デモの両方で使う）----
 function setMode(m){S.mode=m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x.dataset.m===m));recompute();}
 function setVis(v){S.vis=v;document.querySelectorAll('#vis button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));if(v==='public'){S.sel=null;showDetail(null);}recompute();}
+// スライダーの塗りと目盛りの強調を、今の値に合わせる
+function paintSlider(id,v,marks){const el=document.getElementById(id);const a=+el.min,b=+el.max;
+  el.style.setProperty('--fill',((v-a)/(b-a)*100)+'%');
+  document.querySelectorAll('#'+id+'-ticks span').forEach((t,k)=>t.classList.toggle('on',marks[k]===v));}
 function setT(t){S.T=t;document.getElementById('T').value=t;recompute();}
 function setP(p){S.P=p;document.getElementById('P').value=Math.round(p*100);recompute();}
 function rot(lon,lat,zoom,pitch,b0,b1,ms){window.deckgl.setProps({initialViewState:{longitude:lon,latitude:lat,zoom,pitch,bearing:b1,transitionDuration:ms,transitionInterpolator:new deck.LinearInterpolator(['bearing','zoom','pitch','longitude','latitude'])}});}
