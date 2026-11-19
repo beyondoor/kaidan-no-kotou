@@ -276,12 +276,17 @@ function showDetail(i){
 const {DeckGL,SolidPolygonLayer,COORDINATE_SYSTEM,TextLayer,LightingEffect,AmbientLight,DirectionalLight}=deck;
 let viewState;
 function toLL(x,y){return [D.meta.lon0+x/D.meta.kx, D.meta.lat0+y/D.meta.ky];}
+// 引きすぎ・動かしすぎを防ぐ（板橋区の外へ出ない／ズームは13.3〜19）
+const VIEW={minZoom:13.3,maxZoom:19,labelZoom:14.6,lon0:139.60,lon1:139.75,lat0:35.735,lat1:35.81};
 function initDeck(){
   const tk=D.chome.find(c=>c.name==='高島平２丁目');
   const [lon,lat]=tk&&tk.cx!=null?toLL(tk.cx,tk.cy):[139.66,35.785];
-  viewState={longitude:lon,latitude:lat,zoom:15.4,pitch:58,bearing:-28};
+  viewState={longitude:lon,latitude:lat,zoom:15.4,pitch:58,bearing:-28,minZoom:VIEW.minZoom,maxZoom:VIEW.maxZoom};S.showLabels=true;
   const lighting=new LightingEffect({a:new AmbientLight({intensity:1.6}),d:new DirectionalLight({direction:[-1,-2,-3],intensity:1.3})});
   window.deckgl=new DeckGL({container:'map',initialViewState:viewState,controller:true,effects:[lighting],
+    onViewStateChange:({viewState:v})=>{const z=Math.min(VIEW.maxZoom,Math.max(VIEW.minZoom,v.zoom));
+      const o={...v,zoom:z,minZoom:VIEW.minZoom,maxZoom:VIEW.maxZoom,longitude:Math.min(VIEW.lon1,Math.max(VIEW.lon0,v.longitude)),latitude:Math.min(VIEW.lat1,Math.max(VIEW.lat0,v.latitude))};
+      const show=z>=VIEW.labelZoom;if(show!==S.showLabels){S.showLabels=show;updateLayers();}return o;},
     parameters:{clearColor:[0.957,0.961,0.965,1]},
     getTooltip:({object,layer})=>{if(!object||!layer||layer.id!=='apt'||S.vis==='public')return null;const i=object.i;return {text:`${D.apt.F[i]}階建て／推定 ${rng(est[i].lo,est[i].hi)}人`};},
     onClick:({object,layer})=>{if(object&&layer&&layer.id==='apt'){S.sel=object.i;showDetail(object.i);}},
@@ -298,7 +303,7 @@ function updateLayers(){
     updateTriggers:{getPolygon:[S.mode,S.T,S.vis],getElevation:[S.mode,S.T,S.vis],getFillColor:[S.mode,S.T,S.P,S.vis]},material:{ambient:.55,diffuse:.55}});
   const labels=new TextLayer({id:'lab',data:D.chome.filter(c=>c.cx!=null&&c.napt>5),getPosition:c=>toLL(c.cx,c.cy).concat([60]),getText:c=>c.name,
     getSize:12,getColor:[40,40,40,220],fontFamily:'Noto Sans JP, sans-serif',characterSet:'auto',background:true,getBackgroundColor:[255,255,255,200],backgroundPadding:[3,1]});
-  window.deckgl.setProps({layers:[ctx,apt,labels]});
+  window.deckgl.setProps({layers:S.showLabels===false?[ctx,apt]:[ctx,apt,labels]});
 }
 function fly(lon,lat,zoom,pitch=58,bearing=-28){window.deckgl.setProps({initialViewState:{longitude:lon,latitude:lat,zoom,pitch,bearing,transitionDuration:1400,transitionInterpolator:new deck.FlyToInterpolator()}});}
 function flyChome(j){const c=D.chome[j];if(c.cx==null)return;const [lon,lat]=toLL(c.cx,c.cy);fly(lon,lat,16.2);S.focusChome=j;}
