@@ -27,6 +27,8 @@ index.html をダブルクリックで開くと、データを読めずに動き
 - data.json.gz：板橋区の共同住宅21,476棟と周りの建物の形・属性、町丁目の人口（gzipで圧縮）
 - prep.py：data.json を作るスクリプト
   `python3 prep.py itabashi_plateau_buildings.json itabashi_age_by_chome.csv data.json`
+- analysis/verify.py：画面と同じ式で推定人数を計算し直し、ブラウザの数字と合うか確かめるスクリプト。町丁目の順位の安定度も、画面より多い回数で調べられます（標準ライブラリだけで動きます）
+  `python3 analysis/verify.py --trials 1000`
 
 ## データと出典
 - 国土交通省 Project PLATEAU 板橋区 建築物モデル（2025年度、LOD1、3D Tiles）CC BY 4.0 を加工
